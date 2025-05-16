@@ -87,6 +87,7 @@ export default function Raycaster3D({ character }: { character: Character }) {
     if (!ctx) return;
     ctx.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     const map = dungeonState.map;
+    const wallEvents = dungeonState.wallEvents || {};
     // Use player position from dungeonState
     const player = dungeonState.player;
     const pos = { x: player.x + 0.5, y: player.y + 0.5 };
@@ -101,6 +102,7 @@ export default function Raycaster3D({ character }: { character: Character }) {
       const rayAngle = angle - FOV / 2 + (i / NUM_RAYS) * FOV;
       let dist = 0;
       let hit = false;
+      let hitX = 0, hitY = 0;
       while (!hit && dist < MAX_DEPTH) {
         dist += 0.03;
         const testX = pos.x + Math.cos(rayAngle) * dist;
@@ -111,6 +113,8 @@ export default function Raycaster3D({ character }: { character: Character }) {
           map[Math.floor(testY)][Math.floor(testX)] === 0
         ) {
           hit = true;
+          hitX = Math.floor(testX);
+          hitY = Math.floor(testY);
         }
       }
       if (dist < MAX_DEPTH) {
@@ -128,8 +132,164 @@ export default function Raycaster3D({ character }: { character: Character }) {
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(i * (SCREEN_WIDTH / NUM_RAYS), (SCREEN_HEIGHT - wallHeight) / 2, SCREEN_WIDTH / NUM_RAYS + 1, wallHeight);
       }
+      // --- FIX: Render sprite for event behind wall (correct tile, correct bounds) ---
+      let behindDist = dist + 0.05;
+      const behindXf = pos.x + Math.cos(rayAngle) * behindDist;
+      const behindYf = pos.y + Math.sin(rayAngle) * behindDist;
+      const behindX = Math.floor(behindXf);
+      const behindY = Math.floor(behindYf);
+      if (
+        behindX >= 0 && behindX < map[0].length &&
+        behindY >= 0 && behindY < map.length &&
+        map[hitY][hitX] === 0 && // Only if wall is still present
+        map[behindY][behindX] === 1 // Only if tile behind is floor
+      ) {
+        const eventKey = `${behindX},${behindY}`;
+        const event = wallEvents[eventKey];
+        if (event && event.type && event.type !== 'none') {
+          // Project the tile behind the wall to the screen
+          const eventDist = Math.sqrt((behindX + 0.5 - pos.x) ** 2 + (behindY + 0.5 - pos.y) ** 2);
+          const spriteHeight = Math.min(
+            (WALL_HEIGHT / (eventDist * Math.cos(rayAngle - angle))) * SCREEN_HEIGHT / 2,
+            SCREEN_HEIGHT / 2
+          );
+          const spriteWidth = (SCREEN_WIDTH / NUM_RAYS) / 2;
+          const x = i * (SCREEN_WIDTH / NUM_RAYS) + (SCREEN_WIDTH / NUM_RAYS - spriteWidth) / 2;
+          const y = (SCREEN_HEIGHT - spriteHeight) / 2 + SCREEN_HEIGHT / 4;
+          ctx.save();
+          if (event.type === 'cheap-treasure') {
+            ctx.fillStyle = '#ffe066';
+            ctx.beginPath();
+            ctx.arc(x + spriteWidth / 2, y + spriteHeight / 2, Math.min(spriteWidth, spriteHeight) / 3, 0, 2 * Math.PI);
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#bfa980';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          } else if (event.type === 'expensive-treasure') {
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.moveTo(x + spriteWidth / 2, y + spriteHeight / 4);
+            ctx.lineTo(x + spriteWidth * 0.8, y + spriteHeight / 2);
+            ctx.lineTo(x + spriteWidth / 2, y + spriteHeight * 0.75);
+            ctx.lineTo(x + spriteWidth * 0.2, y + spriteHeight / 2);
+            ctx.closePath();
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#fffde7';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          } else if (event.type === 'trap') {
+            ctx.fillStyle = '#a259c6';
+            ctx.beginPath();
+            ctx.moveTo(x + spriteWidth / 2, y + spriteHeight / 4);
+            ctx.lineTo(x + spriteWidth * 0.8, y + spriteHeight * 0.75);
+            ctx.lineTo(x + spriteWidth * 0.2, y + spriteHeight * 0.75);
+            ctx.closePath();
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#ce93d8';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+      // Draw event overlays for treasures/traps as wall-like slices (half height, half width, centered)
+      // Find the first floor tile after the wall
+      let floorDist = dist;
+      let foundFloor = false;
+      let floorX = hitX, floorY = hitY;
+      while (!foundFloor && floorDist < MAX_DEPTH) {
+        floorDist += 0.03;
+        const testX = pos.x + Math.cos(rayAngle) * floorDist;
+        const testY = pos.y + Math.sin(rayAngle) * floorDist;
+        if (
+          testY < 0 || testY >= map.length ||
+          testX < 0 || testX >= map[0].length
+        ) {
+          break;
+        }
+        if (map[Math.floor(testY)][Math.floor(testX)] === 1) {
+          foundFloor = true;
+          floorX = Math.floor(testX);
+          floorY = Math.floor(testY);
+        }
+      }
+      if (foundFloor) {
+        const wallKey = `${floorX},${floorY}`;
+        const event = wallEvents[wallKey];
+        if (event && event.type && event.type !== 'none') {
+          // Project the floor tile to the screen as a wall-like slice (half height, half width, centered)
+          // Calculate distance from player to this tile
+          const eventDist = Math.sqrt((floorX + 0.5 - pos.x) ** 2 + (floorY + 0.5 - pos.y) ** 2);
+          const sliceHeight = Math.min(
+            (WALL_HEIGHT / (eventDist * Math.cos(rayAngle - angle))) * SCREEN_HEIGHT / 2,
+            SCREEN_HEIGHT / 2
+          );
+          const sliceWidth = (SCREEN_WIDTH / NUM_RAYS) / 2;
+          const x = i * (SCREEN_WIDTH / NUM_RAYS) + (SCREEN_WIDTH / NUM_RAYS - sliceWidth) / 2;
+          const y = (SCREEN_HEIGHT - sliceHeight) / 2 + SCREEN_HEIGHT / 4;
+          ctx.save();
+          if (event.type === 'cheap-treasure') {
+            ctx.fillStyle = '#ffe066';
+            ctx.fillRect(x, y, sliceWidth, sliceHeight);
+            // Draw coin icon overlay
+            ctx.beginPath();
+            ctx.arc(x + sliceWidth / 2, y + sliceHeight / 2, Math.min(sliceWidth, sliceHeight) / 3, 0, 2 * Math.PI);
+            ctx.fillStyle = '#fff176';
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+          } else if (event.type === 'expensive-treasure') {
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(x, y, sliceWidth, sliceHeight);
+            // Draw gem icon overlay
+            ctx.beginPath();
+            ctx.moveTo(x + sliceWidth / 2, y + sliceHeight / 4);
+            ctx.lineTo(x + sliceWidth * 0.8, y + sliceHeight / 2);
+            ctx.lineTo(x + sliceWidth / 2, y + sliceHeight * 0.75);
+            ctx.lineTo(x + sliceWidth * 0.2, y + sliceHeight / 2);
+            ctx.closePath();
+            ctx.fillStyle = '#fffde7';
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+          } else if (event.type === 'trap') {
+            ctx.fillStyle = '#a259c6';
+            ctx.fillRect(x, y, sliceWidth, sliceHeight);
+            // Draw trap icon overlay (triangle)
+            ctx.beginPath();
+            ctx.moveTo(x + sliceWidth / 2, y + sliceHeight / 4);
+            ctx.lineTo(x + sliceWidth * 0.8, y + sliceHeight * 0.75);
+            ctx.lineTo(x + sliceWidth * 0.2, y + sliceHeight * 0.75);
+            ctx.closePath();
+            ctx.fillStyle = '#ce93d8';
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+          }
+          ctx.restore();
+        }
+      }
     }
   }, [dungeonState, angle]);
+
+  // Force update on keydown and window focus to ensure 3D view is always in sync
+  useEffect(() => {
+    function forceUpdate() {
+      setDungeonState((prev) => ({ ...prev } as DungeonRenderProps));
+    }
+    window.addEventListener('keydown', forceUpdate);
+    window.addEventListener('focus', forceUpdate);
+    return () => {
+      window.removeEventListener('keydown', forceUpdate);
+      window.removeEventListener('focus', forceUpdate);
+    };
+  }, []);
 
   // Remove remapping of movement keys to camera-relative directions
   // Restore previous movement handler: WASD/arrow keys are passed directly to DungeonCrawler
@@ -163,23 +323,66 @@ export default function Raycaster3D({ character }: { character: Character }) {
     if (!dungeonState) return null;
     const map = dungeonState.map;
     const player = dungeonState.player;
+    const wallEvents = dungeonState.wallEvents || {};
     const cellSize = 8;
     return (
       <svg width={map[0].length * cellSize} height={map.length * cellSize} style={{ background: '#222', borderRadius: 6, boxShadow: '0 1px 6px #0006', marginLeft: 24 }}>
         {map.map((row, y) =>
-          row.map((tile, x) => (
-            <rect
-              key={x + '-' + y}
-              x={x * cellSize}
-              y={y * cellSize}
-              width={cellSize}
-              height={cellSize}
-              fill={tile === 1 ? '#bcbcbc' : '#333'}
-              stroke="#181818"
-              strokeWidth={0.5}
-            />
-          ))
+          row.map((tile, x) => {
+            // Draw base tile
+            let fill = tile === 1 ? '#bcbcbc' : '#333';
+            let event = wallEvents[`${x},${y}`];
+            // Overlay event color
+            if (event && event.type && event.type !== 'none') {
+              if (event.type === 'cheap-treasure') fill = '#ffe066';
+              else if (event.type === 'expensive-treasure') fill = '#ffd700';
+              else if (event.type === 'trap') fill = '#a259c6';
+            }
+            return (
+              <rect
+                key={x + '-' + y}
+                x={x * cellSize}
+                y={y * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill={fill}
+                stroke="#181818"
+                strokeWidth={0.5}
+              />
+            );
+          })
         )}
+        {/* Draw event icons on top */}
+        {Object.entries(wallEvents).map(([key, event]) => {
+          if (!event || !event.type || event.type === 'none') return null;
+          const [x, y] = key.split(',').map(Number);
+          if (x < 0 || y < 0 || x >= map[0].length || y >= map.length) return null;
+          const cx = x * cellSize + cellSize / 2;
+          const cy = y * cellSize + cellSize / 2;
+          if (event.type === 'cheap-treasure') {
+            return (
+              <circle key={key} cx={cx} cy={cy} r={cellSize * 0.25} fill="#fff176" stroke="#bfa980" strokeWidth={0.8} />
+            );
+          } else if (event.type === 'expensive-treasure') {
+            return (
+              <polygon key={key} points={
+                `${cx},${cy - cellSize * 0.22} ` +
+                `${cx + cellSize * 0.18},${cy} ` +
+                `${cx},${cy + cellSize * 0.22} ` +
+                `${cx - cellSize * 0.18},${cy}`
+              } fill="#fffde7" stroke="#ffd700" strokeWidth={0.8} />
+            );
+          } else if (event.type === 'trap') {
+            return (
+              <polygon key={key} points={
+                `${cx},${cy - cellSize * 0.18} ` +
+                `${cx + cellSize * 0.18},${cy + cellSize * 0.18} ` +
+                `${cx - cellSize * 0.18},${cy + cellSize * 0.18}`
+              } fill="#ce93d8" stroke="#a259c6" strokeWidth={0.8} />
+            );
+          }
+          return null;
+        })}
         {/* Player position */}
         <circle
           cx={player.x * cellSize + cellSize / 2}
