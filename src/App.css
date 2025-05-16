@@ -1,0 +1,158 @@
+body, html {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  /* Prevent scrollbars on dungeon screen */
+  overflow: hidden !important;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.customize-container {
+  max-width: none;
+  width: fit-content;
+  min-width: 700px;
+  margin: 2rem auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px #0001;
+  padding: 2rem 2.5rem 2.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.customize-columns {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2.5rem;
+  width: 100%;
+}
+
+.customize-col {
+  background: #f7f5e6;
+  border-radius: 12px;
+  box-shadow: 0 1px 8px #0002;
+  padding: 1.2rem 1.5rem 1.5rem 1.5rem;
+  min-width: 180px;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.customize-col h2 {
+  margin-top: 0.2rem;
+  margin-bottom: 0.7rem;
+}
+
+@media (max-width: 900px) {
+  .customize-container {
+    min-width: 0;
+    padding: 1rem 0.5rem;
+  }
+  .customize-columns {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .customize-col {
+    min-width: 0;
+    width: 100%;
+    padding: 1rem 0.5rem;
+  }
+}
+
+.color-options {
+  display: flex;
+  gap: 1rem;
+  margin: 0.5rem 0 1.5rem 0;
+  justify-content: center;
+}
+.color-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid #ccc;
+  transition: border 0.2s;
+}
+.start-btn {
+  margin-top: 1.5rem;
+  padding: 0.75rem 2rem;
+  font-size: 1.2rem;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.start-btn:hover {
+  background: #125ea2;
+}
+.race-placeholder {
+  text-align: center;
+  margin-top: 3rem;
+}
+
+.weapon-options {
+  display: flex;
+  gap: 1rem;
+  margin: 0.5rem 0 1.5rem 0;
+  justify-content: center;
+}
+.weapon-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  background: #f5f5f5;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  transition: border 0.2s, background 0.2s;
+}
+.weapon-btn:hover {
+  background: #e3e3e3;
+}
